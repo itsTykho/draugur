@@ -1,0 +1,21 @@
+[package]
+name = "draugur"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.66"
+chrono = "0.4.33"
+futures = "0.3.30"
+futures-util = "0.3.30"
+lazy_static = "1.4.0"
+serde = { version = "1.0.196", features = ["derive"] }
+serde_json = "1.0.112"
+serde_with = "3.5.1"
+serenity = { version = "0.12.0", default-features = false, features = ["client", "gateway", "rustls_backend", "model", "cache", "framework", "standard_framework"] }
+sys-info = "0.9.1"
+tokio = { version = "*", features = ["full"] }
+tokio-tungstenite = { version = "0.21.0", features = ["rustls-tls-native-roots"] }
+tracing = "0.1.37"
+tungstenite = { version = "0.21.0", features = ["rustls-tls-native-roots"] }
+url = "2.5.0"
