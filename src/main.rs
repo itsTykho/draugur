@@ -1,5 +1,4 @@
 pub mod models;
-pub mod socket;
 pub mod ws;
 
 use std::collections::HashSet;
@@ -121,6 +120,7 @@ async fn main() {
         | GatewayIntents::DIRECT_MESSAGES
         | GatewayIntents::GUILDS
         | GatewayIntents::MESSAGE_CONTENT;
+        
     let mut client = Client::builder(&token, intents)
         .framework(framework)
         .event_handler(Bot {
