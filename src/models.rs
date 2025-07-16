@@ -11,18 +11,18 @@ pub struct Killmail {
     #[serde(rename = "solar_system_id")]
     pub solar_system_id: i64,
     pub victim: Victim,
-    pub zkb: Zkb,
+    // pub zkb: Zkb,
 }
 
 #[serde_with::skip_serializing_none]
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+// #[serde(rename_all = "camelCase")]
 pub struct Attacker {
     #[serde(default = "default_to_zero")]
     pub killmail_id: i64,
     #[serde(rename = "alliance_id")]
-    #[serde(default = "default_to_zero")]
-    pub alliance_id: i64,
+    #[serde(default = "default_to_zero_option")]
+    pub alliance_id: Option<i64>,
     #[serde(rename = "character_id")]
     #[serde(default = "default_to_zero")]
     pub character_id: i64,
@@ -46,10 +46,12 @@ pub struct Attacker {
 
 #[serde_with::skip_serializing_none]
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
 pub struct Victim {
     #[serde(default = "default_to_zero")]
     pub killmail_id: i64,
+    #[serde(rename = "alliance_id")]
+    #[serde(default = "default_to_zero_option")]
+    pub alliance_id: Option<i64>,
     #[serde(rename = "character_id")]
     #[serde(default = "default_to_zero")]
     pub character_id: i64,
@@ -83,6 +85,10 @@ pub struct Zkb {
     pub npc: bool,
     pub solo: bool,
     pub awox: bool,
+}
+
+fn default_to_zero_option() -> Option<i64> {
+    Some(0)
 }
 
 fn default_to_zero() -> i64 {

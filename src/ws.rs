@@ -1,88 +1,109 @@
-use crate::models::{Attacker, Killmail};
-use futures::SinkExt;
-use futures_util::StreamExt;
-use serenity::all::ChannelId;
-use serenity::builder::{CreateEmbed, CreateMessage};
+use crate::helpers::{get_vic_info, track_recent_kill};
+use crate::models::Killmail;
+use crate::models::Zkb;
+use crate::msg::create_msg;
+
+use log::{debug, error};
+use once_cell::sync::Lazy;
+use serde::{Deserialize, Serialize};
 use serenity::client::Context;
-use serenity::model::Colour;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::sync::mpsc;
-use tokio_tungstenite::connect_async;
-use tungstenite::Message;
+use std::collections::HashMap;
+use std::time::Duration;
+use tokio::sync::RwLock;
 
-const GREEN_KILL: Colour = Colour::from_rgb(50, 230, 175);
-const RED_LOSS: Colour = Colour::from_rgb(180, 50, 110);
+pub static SERVER_CONFIGS: Lazy<RwLock<HashMap<u64, ServerConfig>>> =
+    Lazy::new(|| RwLock::new(HashMap::new()));
 
-pub async fn kill_feed(ctx: &Context) {
-    let url = url::Url::parse("wss://zkillboard.com/websocket/").unwrap();
-
-    let (stdin_tx, mut stdin_rx) = mpsc::unbounded_channel();
-    tokio::spawn(read_stdin(stdin_tx));
-
-    let (mut ws_stream, _) = connect_async(url).await.expect("Failed to connect");
-    println!("ZKill handshake has completed succesfully");
-
-    let _ = ws_stream
-        .send(Message::Text(
-            "{\"action\":\"sub\",\"channel\":\"killstream\"}".into(),
-        ))
-        .await;
-
-    let (mut write, mut read) = ws_stream.split();
-
-    let stdin_to_ws = async {
-        while let Some(message) = stdin_rx.recv().await {
-            write
-                .send(message)
-                .await
-                .expect("Failed to send message to WebSocket");
-        }
-    };
-
-    let ws_to_stdout = async {
-        while let Some(message) = read.next().await {
-            // println!("{:?}", message);
-            let data = message.unwrap().into_data();
-            if !data.is_empty() {
-                let parsed: Killmail =
-                    serde_json::from_slice(&data).expect("Unable to parse to json");
-
-                let embed = CreateEmbed::new().title("Kill").colour(GREEN_KILL).field(
-                    "Killmail",
-                    parsed.killmail_id.to_string(),
-                    false,
-                );
-                let builder = CreateMessage::new().embed(embed);
-                let message = ChannelId::new(586294661010685954)
-                    .send_message(&ctx, builder)
-                    .await;
-                if let Err(why) = message {
-                    eprintln!("Error sending message: {why:?}");
-                };
-            }
-            tokio::io::stdout()
-                .write_all(&data)
-                .await
-                .expect("Failed to write to stdout");
-        }
-    };
-
-    tokio::select! {
-        _ = stdin_to_ws => (),
-        _ = ws_to_stdout => (),
-    };
+#[derive(Clone, Serialize, Deserialize)]
+pub struct ServerConfig {
+    pub follow_id: i64,
+    pub channel_id: u64,
 }
 
-async fn read_stdin(tx: mpsc::UnboundedSender<Message>) {
-    let mut stdin = tokio::io::stdin();
+pub async fn kill_feed(ctx: &Context) {
+    let url = format!("https://zkillredisq.stream/listen.php?queueID=draugur");
+
+    let client = reqwest::Client::new();
     loop {
-        let mut buf = vec![0; 1024];
-        let n = match stdin.read(&mut buf).await {
-            Err(_) | Ok(0) => break,
-            Ok(n) => n,
-        };
-        buf.truncate(n);
-        tx.send(Message::text(String::from_utf8(buf).unwrap()))
-            .expect("Failed to send message to WebSocket");
+        match client.get(&url).send().await {
+            Ok(response) => {
+                if let Ok(text) = response.text().await {
+                    if let Ok(redis_response) = serde_json::from_str::<serde_json::Value>(&text) {
+                        if let Some(package) = redis_response.get("package") {
+                            if package.is_null() {
+                                continue;
+                            }
+
+                            if let Some(killmail_data) = package.get("killmail") {
+                                if let Some(zkb_data) = package.get("zkb") {
+                                    debug!("ZKB DATA: {:?}", zkb_data);
+                                    if let Ok(parsed) =
+                                        serde_json::from_value::<Killmail>(killmail_data.clone())
+                                    {
+                                        if let Ok(zkb) =
+                                            serde_json::from_value::<Zkb>(zkb_data.clone())
+                                        {
+                                            let (vic, vic_ship) =
+                                                get_vic_info(parsed.clone()).await;
+
+                                            track_recent_kill(
+                                                parsed.killmail_id,
+                                                zkb.total_value,
+                                                vic,
+                                                vic_ship,
+                                            )
+                                            .await;
+                                            let mut a_ids: Vec<i64> = Vec::new();
+                                            for attacker in parsed.attackers.iter() {
+                                                if let Some(alliance_id) = attacker.alliance_id {
+                                                    a_ids.push(alliance_id);
+                                                }
+                                            }
+                                            let mut corp_ids: Vec<i64> = Vec::new();
+                                            for attacker in parsed.attackers.iter() {
+                                                corp_ids.push(attacker.corporation_id);
+                                            }
+                                            let configs = SERVER_CONFIGS.read().await;
+                                            for (_guild_id, config) in configs.iter() {
+                                                if parsed.victim.corporation_id == config.follow_id
+                                                    || parsed.victim.alliance_id
+                                                        == Some(config.follow_id)
+                                                {
+                                                    debug!("SENDING LOSS");
+                                                    create_msg(
+                                                        ctx,
+                                                        config.channel_id,
+                                                        "loss".to_string(),
+                                                        parsed.clone(),
+                                                        zkb.clone(),
+                                                    )
+                                                    .await
+                                                } else if a_ids.contains(&config.follow_id)
+                                                    || corp_ids.contains(&config.follow_id)
+                                                {
+                                                    debug!("SENDING KILL");
+                                                    create_msg(
+                                                        ctx,
+                                                        config.channel_id,
+                                                        "kill".to_string(),
+                                                        parsed.clone(),
+                                                        zkb.clone(),
+                                                    )
+                                                    .await
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                error!("request failed: {}", e);
+                tokio::time::sleep(Duration::from_secs(3)).await;
+            }
+        }
     }
 }
