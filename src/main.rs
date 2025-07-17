@@ -19,7 +19,7 @@ use serenity::model::gateway::Ready;
 use serenity::prelude::*;
 use serenity::{all::GuildId, async_trait};
 
-use commands::setup_command;
+use commands::{list_command, remove_command, setup_command};
 use configs::load_configs;
 use helpers::get_most_expensive_recent_kill;
 use ws::kill_feed;
@@ -40,6 +40,8 @@ impl EventHandler for Bot {
         if let Interaction::Command(command) = interaction {
             match command.data.name.as_str() {
                 "setup" => setup_command(&ctx, &command).await,
+                "remove" => remove_command(&ctx, &command).await,
+                "list" => list_command(&ctx, &command).await,
                 _ => {}
             }
         }
@@ -56,7 +58,7 @@ impl EventHandler for Bot {
     async fn ready(&self, ctx: Context, ready: Ready) {
         info!("{} is connected!", ready.user.name);
 
-        let command = CreateCommand::new("setup")
+        let setup_command = CreateCommand::new("setup")
             .description("Setup killmail tracking for this server")
             .add_option(
                 CreateCommandOption::new(
@@ -67,8 +69,23 @@ impl EventHandler for Bot {
                 .required(true),
             );
 
-        if let Err(why) = ctx.http.create_global_command(&command).await {
-            error!("cannot create slash command: {}", why);
+        let remove_command = CreateCommand::new("remove")
+            .description("Remove an ID from tracking")
+            .add_option(
+                CreateCommandOption::new(
+                    CommandOptionType::String,
+                    "follow_id",
+                    "Corporation, alliance, character, system, or ship ID to track",
+                )
+                .required(true),
+            );
+
+        let list_command = CreateCommand::new("list").description("Show all currently tracked IDs");
+
+        for command in [setup_command, remove_command, list_command] {
+            if let Err(why) = ctx.http.create_global_command(&command).await {
+                error!("cannot create slash command: {}", why);
+            }
         }
     }
 
