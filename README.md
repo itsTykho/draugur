@@ -3,7 +3,7 @@
 
 A dead simple Discord bot that tracks killmails in real-time and posts them to Discord channels, not trying to be anything fancier.
 
-Built with Rust using the Serenity framework and zKill's RedisQ service.
+Built with Rust using the Serenity framework and zkill's RedisQ service.
 
 [Invite Link](https://discord.com/oauth2/authorize?client_id=1200488782110138488&permissions=84032&integration_type=0&scope=applications.commands+bot)
 
@@ -33,7 +33,7 @@ Go to `zkillboard.com`, search for whatever you'd like to track. In the URL, the
 
 ## Acknowledgments
 
-- [zKillboard](https://zkillboard.com/) for providing the RedisQ killmail feed
+- [zkillboard](https://zkillboard.com/) for providing the RedisQ killmail feed
 - [CCP Games](https://www.ccpgames.com/) for EVE Online and the ESI API
 
 ## Support
@@ -42,4 +42,4 @@ Go to `zkillboard.com`, search for whatever you'd like to track. In the URL, the
 
 ---
 
-**Note**: This bot is not affiliated with CCP Games or EVE Online. EVE Online is a trademark of CCP hf.
+**Note**: This bot is not affiliated with CCP Games or EVE Online.
