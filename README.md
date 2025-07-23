@@ -25,9 +25,9 @@ Add an entity ID to your server's tracking list. Works for characters, corps, sy
 Remove an entity ID from your server's tracking list.
 
 ### `/list`
-Display all currently tracked entity IDs and the channel they post to.
+Display all currently tracked IDs and the channel they post to.
 
-## Finding Entity IDs
+## Finding IDs
 
 Go to `zkillboard.com`, search for whatever you'd like to track. In the URL, there will be a bunch of numbers at the end - that is the ID you're looking for.
 
@@ -38,8 +38,8 @@ Go to `zkillboard.com`, search for whatever you'd like to track. In the URL, the
 
 ## Support
 
-- Create an issue on GitHub for bugs or feature requests
+- Create an issue on GitHub for bugs or feature requests, or contact me on Discord: @zigz
 
 ---
 
-**Note**: This bot is not affiliated with CCP Games or EVE Online.
+**Note**: This bot is not affiliated with CCP Games or EVE Online. All EVE related materials are property of CCP Games.
